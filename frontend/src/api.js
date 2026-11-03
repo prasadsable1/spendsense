@@ -1,12 +1,31 @@
 import axios from 'axios'
 
-const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+const configuredApiUrl = import.meta.env.VITE_API_URL
+if (import.meta.env.PROD && !configuredApiUrl) {
+  throw new Error('VITE_API_URL must be configured for a production build.')
+}
+
+const apiBaseUrl = configuredApiUrl || 'http://localhost:8000/api'
 
 export const apiDocsUrl = new URL('/docs', apiBaseUrl).toString()
 
 const api = axios.create({
   baseURL: apiBaseUrl,
-  timeout: 15000,
+  timeout: 120000,
+})
+
+api.interceptors.request.use((config) => {
+  const token = sessionStorage.getItem('spendsense_token')
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
+
+api.interceptors.response.use(undefined, (error) => {
+  if (error.response?.status === 401 && sessionStorage.getItem('spendsense_token')) {
+    sessionStorage.removeItem('spendsense_token')
+    window.dispatchEvent(new Event('spendsense:auth-required'))
+  }
+  return Promise.reject(error)
 })
 
 export function errorMessage(error) {

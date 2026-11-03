@@ -53,3 +53,7 @@ class BudgetOutput(BaseModel):
     remaining: Decimal
     percent_used: float
     status: str
+
+
+class LoginInput(BaseModel):
+    password: str = Field(min_length=1, max_length=1024)

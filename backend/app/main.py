@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+import os
 import re
 from calendar import monthrange
 from contextlib import asynccontextmanager
@@ -9,18 +10,19 @@ from decimal import Decimal, InvalidOperation
 from typing import Annotated
 
 import pandas as pd
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.analytics import budget_usage, detect_anomalies, forecast_spending, spending_analytics, summarize_transactions
-from app.config import cors_origins
+from app.auth import auth_required, issue_token, validate_auth_settings, verify_password, verify_token
+from app.config import cors_origins, validate_production_cors
 from app.database import Base, get_db, get_engine
 from app.models import Budget, Category, ImportHistory, Transaction
-from app.schemas import BudgetInput, BudgetOutput, CategoryInput, CategoryOutput, TransactionInput, TransactionOutput
+from app.schemas import BudgetInput, BudgetOutput, CategoryInput, CategoryOutput, LoginInput, TransactionInput, TransactionOutput
 
 DEFAULT_CATEGORIES = [
     ("Food", "#f0a85c"), ("Travel", "#6db9d0"), ("Shopping", "#b28bfa"),
@@ -43,6 +45,8 @@ def initialize_database() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    validate_auth_settings()
+    validate_production_cors()
     initialize_database()
     yield
 
@@ -58,8 +62,32 @@ app.add_middleware(
     allow_origins=cors_origins(),
     allow_credentials=False,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["Content-Type"],
+    allow_headers=["Authorization", "Content-Type"],
 )
+
+
+@app.middleware("http")
+async def require_authenticated_owner(request: Request, call_next):
+    public_paths = {"/api/health", "/api/auth/status", "/api/auth/login"}
+    if (
+        request.url.path.startswith("/api/")
+        and request.url.path not in public_paths
+        and request.method != "OPTIONS"
+        and auth_required()
+    ):
+        scheme, _, token = request.headers.get("authorization", "").partition(" ")
+        secret = os.environ.get("APP_SECRET_KEY", "")
+        if (
+            scheme.lower() != "bearer"
+            or not token
+            or not verify_token(token, secret)
+        ):
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Sign in to access your SpendSense data."},
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    return await call_next(request)
 
 
 def _transaction_query(db: Session, year: int | None = None, month: int | None = None):
@@ -93,6 +121,34 @@ def _require_category(db: Session, category_id: int) -> Category:
 def health(db: Session = Depends(get_db)):
     db.execute(select(1))
     return {"status": "ok", "database": "connected"}
+
+
+@app.get("/api/auth/status")
+def authentication_status():
+    return {"required": auth_required()}
+
+
+@app.post("/api/auth/login")
+def login(payload: LoginInput):
+    if not auth_required():
+        raise HTTPException(404, "Authentication is not enabled.")
+    encoded_password = os.environ.get("APP_PASSWORD_HASH", "")
+    if not verify_password(payload.password, encoded_password):
+        raise HTTPException(
+            401,
+            "Incorrect password.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    token = issue_token(os.environ["APP_SECRET_KEY"])
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+    }
+
+
+@app.get("/api/auth/me")
+def current_user():
+    return {"authenticated": True}
 
 
 @app.get("/api/categories", response_model=list[CategoryOutput])

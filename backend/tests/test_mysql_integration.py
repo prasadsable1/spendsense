@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app.database import get_session_factory
+from app.auth import hash_password
 from app.main import app
 from app.models import ImportHistory
 
@@ -315,3 +316,31 @@ def test_mysql_analytics_chronological_forecast_and_anomaly_detection(mysql_api)
         increase["month"] == date.today().strftime("%Y-%m")
         for increase in anomaly_response.json()["spending_increases"]
     )
+
+
+def test_mysql_api_authentication_protects_financial_endpoints(mysql_api, monkeypatch):
+    client, _ = mysql_api
+    app_password = "Integration password with enough length"
+    monkeypatch.setenv("APP_AUTH_REQUIRED", "true")
+    monkeypatch.setenv("APP_SECRET_KEY", "integration-signing-key-that-is-at-least-32-chars")
+    monkeypatch.setenv("APP_PASSWORD_HASH", hash_password(app_password))
+
+    assert client.get("/api/auth/status").json() == {"required": True}
+    assert client.get("/api/health").status_code == 200
+    assert client.get("/api/categories").status_code == 401
+    assert client.post("/api/auth/login", json={"password": "incorrect password"}).status_code == 401
+
+    login = client.post("/api/auth/login", json={"password": app_password})
+    assert login.status_code == 200, login.text
+    token = login.json()["access_token"]
+    assert login.json()["token_type"] == "bearer"
+
+    categories = client.get(
+        "/api/categories", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert categories.status_code == 200, categories.text
+
+    monkeypatch.setenv("APP_SECRET_KEY", "rotated-signing-key-that-is-at-least-32-characters")
+    assert client.get(
+        "/api/categories", headers={"Authorization": f"Bearer {token}"}
+    ).status_code == 401

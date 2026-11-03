@@ -38,3 +38,24 @@ def cors_origins() -> list[str]:
         ).split(",")
         if origin.strip()
     ]
+
+
+def validate_production_cors() -> None:
+    auth_enabled = os.environ.get("APP_AUTH_REQUIRED", "false").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    origins = [
+        origin.strip()
+        for origin in os.environ.get("CORS_ORIGINS", "").split(",")
+        if origin.strip()
+    ]
+    if auth_enabled and (
+        not origins or any(not origin.startswith("https://") for origin in origins)
+    ):
+        raise RuntimeError(
+            "When APP_AUTH_REQUIRED is enabled, set CORS_ORIGINS to the exact "
+            "HTTPS origin(s) of the deployed frontend."
+        )

@@ -156,6 +156,41 @@ npm run build
 
 The statistical and forecast tests use synthetic, in-memory examples only. End-to-end transaction/import/budget/report tests require a configured MySQL account. Verify a local connection with `http://localhost:8000/api/health`, then exercise create/edit/delete, CSV preview/confirm, budgets, and CSV export through the UI or `/docs`.
 
-## Deployment preparation
+## Free-tier deployment (Cloudflare Pages + Render + hosted MySQL)
 
-The app is intended for local use. Before any deployment, configure a restricted database user, TLS, a production CORS allowlist, secrets management, authentication/authorization, database migrations, backups, rate limits, and production-grade upload handling. Do not expose the unauthenticated API to an untrusted network. No deployment is performed by this project setup.
+The Render Blueprint at `render.yaml` prepares a free Render web service for the API. It requires a separate, remotely accessible **MySQL** server. Render's free plan does not provide a persistent MySQL database or disk, and the MySQL instance on your development PC is not reachable by Render. Do not expose your PC's MySQL port to the public internet. OCI MySQL HeatWave Always Free is one possible MySQL provider; verify its current terms and card-verification requirements directly with OCI before creating an account or service.
+
+The application now supports optional single-user password authentication. Render enables it and fails closed unless all of `APP_SECRET_KEY`, `APP_PASSWORD_HASH`, and database settings are present. Login returns a signed, expiring bearer token. Generate the production secrets locally without sending them to chat:
+
+```powershell
+Set-Location backend
+.\.venv\Scripts\python.exe -c "import secrets; print(secrets.token_urlsafe(48))"
+.\.venv\Scripts\python.exe -m app.auth
+Set-Location ..
+```
+
+Save the first output as Render's `APP_SECRET_KEY` and the second output as `APP_PASSWORD_HASH` using the Render dashboard's secret environment-variable form. Do not commit these values or put a plaintext password into the repository.
+
+### Deploy FastAPI on Render
+
+1. Provision compatible hosted MySQL. Keep its hostname private and restrict access to the Render API service wherever the provider supports network restrictions.
+2. In Render, create a Blueprint from the private GitHub repository and approve the `render.yaml` web service. Select the **Free** plan; do not approve a paid upgrade.
+3. Configure the Blueprint's `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, and `CORS_ORIGINS` prompted secret/environment values. The last value must be the exact HTTPS Cloudflare Pages origin after creating the Pages project. Configure the generated `APP_SECRET_KEY` and `APP_PASSWORD_HASH` as described above.
+4. If the hosted MySQL provider requires an inbound network allowlist, allow only its published Render egress ranges and port. Never open MySQL to all internet addresses.
+5. Confirm the Render service starts and `https://<render-service>.onrender.com/api/health` returns a connected database status before deploying the frontend. A failed DB connection must be fixed in the provider settings, not replaced with SQLite or fake data.
+
+The Render free web service can sleep while idle and take time to wake. Free services are not a production availability guarantee.
+
+### Deploy React on Cloudflare Pages
+
+1. Create a Pages project from the GitHub repository.
+2. Set the project root/build directory to `frontend`, build command to `npm run build`, and output directory to `dist`.
+3. Set the Pages build environment variable `VITE_API_URL` to `https://<render-service>.onrender.com/api`.
+4. Deploy and note the exact Pages HTTPS origin (for example `https://<project>.pages.dev`). Add that origin to Render's `CORS_ORIGINS`, save, and redeploy/restart the API.
+5. Open the Pages URL; verify the password screen, login, API-backed pages, CSV import/export, and `/api/health`. The `frontend/public/_redirects` file enables client-side route fallback.
+
+The app remains a single-owner workspace: a shared password protects records, but this is not multi-user authorization. Use a unique long password, keep both providers' secrets private, and configure scheduled database backups before entering important financial records. No resource is created by these instructions. Provider terms, free quotas, availability, and verification requirements can change; confirm them before provisioning.
+
+## Screenshots
+
+Screenshots can be added here after deployment; none are included yet.

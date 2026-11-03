@@ -52,6 +52,59 @@ function Loading({ label = 'Loading your financial data…' }) {
   return <div className="loading"><LoaderCircle className="spin" size={22} />{label}</div>
 }
 
+function LoginScreen({ onLogin }) {
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const submit = async (event) => {
+    event.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      const { data } = await api.post('/auth/login', { password })
+      sessionStorage.setItem('spendsense_token', data.access_token)
+      onLogin()
+    } catch (loginError) {
+      setError(errorMessage(loginError))
+    } finally {
+      setBusy(false)
+      setPassword('')
+    }
+  }
+  return <main className="login-screen"><form className="card login-card" onSubmit={submit}><Link to="/" className="brand"><span className="brand-mark"><Activity size={19} /></span><span>spend<span className="brand-accent">sense</span><small>PERSONAL FINANCE</small></span></Link><h1>Your finances, protected.</h1><p>Enter your SpendSense password to continue.</p><Notice>{error}</Notice><label className="field-label">Password<input className="field-input" type="password" autoComplete="current-password" required maxLength={1024} value={password} onChange={(event) => setPassword(event.target.value)} autoFocus /></label><button className="button primary full-button" disabled={busy}>{busy ? <LoaderCircle className="spin" size={15} /> : <ShieldAlert size={15} />} Sign in</button><div className="login-privacy"><ShieldAlert size={14} /> Your financial data is private to your account.</div></form></main>
+}
+
+function AuthGate({ children }) {
+  const [auth, setAuth] = useState({ loading: true, required: false, authenticated: false })
+  const refresh = useCallback(async () => {
+    try {
+      const { data } = await api.get('/auth/status')
+      if (!data.required) {
+        setAuth({ loading: false, required: false, authenticated: true })
+        return
+      }
+      if (!sessionStorage.getItem('spendsense_token')) {
+        setAuth({ loading: false, required: true, authenticated: false })
+        return
+      }
+      await api.get('/auth/me')
+      setAuth({ loading: false, required: true, authenticated: true })
+    } catch {
+      sessionStorage.removeItem('spendsense_token')
+      setAuth({ loading: false, required: true, authenticated: false })
+    }
+  }, [])
+  useEffect(() => {
+    refresh()
+    const expire = () => setAuth({ loading: false, required: true, authenticated: false })
+    window.addEventListener('spendsense:auth-required', expire)
+    return () => window.removeEventListener('spendsense:auth-required', expire)
+  }, [refresh])
+  if (auth.loading) return <Loading label="Checking your secure session…" />
+  if (auth.required && !auth.authenticated) return <LoginScreen onLogin={() => setAuth({ loading: false, required: true, authenticated: true })} />
+  return children
+}
+
 function Empty({ title, text, action }) {
   return <div className="empty"><span className="empty-icon"><Activity size={21} /></span><strong>{title}</strong><p>{text}</p>{action}</div>
 }
@@ -69,6 +122,10 @@ function Layout() {
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
   const title = navGroups.flatMap((group) => group.items).find((item) => location.pathname.startsWith(item.to))?.label || (location.pathname === '/settings' ? 'Settings' : 'Dashboard')
+  const signOut = () => {
+    sessionStorage.removeItem('spendsense_token')
+    window.dispatchEvent(new Event('spendsense:auth-required'))
+  }
   return <div className="app-shell">
     <aside className={`sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
       <Link to="/dashboard" className="brand"><span className="brand-mark"><Activity size={19} /></span><span>spend<span className="brand-accent">sense</span><small>PERSONAL FINANCE</small></span></Link>
@@ -77,7 +134,7 @@ function Layout() {
       <div className="sidebar-bottom"><div className="upgrade-card"><span className="upgrade-icon"><Sparkles size={16} /></span><strong>Clarity, every day.</strong><p>Your finances. Your data. Your decisions.</p><Link to="/analytics">Explore insights <ArrowRight size={13} /></Link></div><NavLink to="/settings" className={({ isActive }) => `nav-link settings-link ${isActive ? 'active' : ''}`}><SettingsIcon size={17} /><span>Settings</span></NavLink><div className="sidebar-foot">SpendSense v1.0 · Local workspace</div></div>
     </aside>
     {mobileOpen && <button className="mobile-backdrop" onClick={() => setMobileOpen(false)} aria-label="Close menu" />}
-    <main className="main-panel"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open menu"><Menu size={19} /></button><div className="breadcrumb">Workspace <span>/</span> <strong>{title}</strong></div><div className="topbar-right"><span className="local-badge"><span /> LOCAL & PRIVATE</span><button className="icon-button" title="Help"><CircleHelp size={18} /></button><span className="avatar small">S</span></div></header><div className="page-content"><Outlet /></div></main>
+    <main className="main-panel"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open menu"><Menu size={19} /></button><div className="breadcrumb">Workspace <span>/</span> <strong>{title}</strong></div><div className="topbar-right"><span className="local-badge"><span /> LOCAL & PRIVATE</span>{sessionStorage.getItem('spendsense_token') && <button className="icon-button" title="Sign out" aria-label="Sign out" onClick={signOut}><ShieldAlert size={18} /></button>}<button className="icon-button" title="Help"><CircleHelp size={18} /></button><span className="avatar small">S</span></div></header><div className="page-content"><Outlet /></div></main>
   </div>
 }
 
@@ -337,5 +394,5 @@ function Landing() {
 function NotFound() { return <div className="not-found"><strong>404</strong><h1>That page isn't here.</h1><Link className="button primary" to="/dashboard">Back to dashboard</Link></div> }
 
 export default function App() {
-  return <Routes><Route path="/" element={<Landing />} /><Route element={<Layout />}><Route path="/dashboard" element={<Dashboard />} /><Route path="/transactions" element={<Transactions />} /><Route path="/add-expense" element={<AddExpense />} /><Route path="/import" element={<ImportCsv />} /><Route path="/categories" element={<Categories />} /><Route path="/budgets" element={<Budgets />} /><Route path="/analytics" element={<Analytics />} /><Route path="/predictions" element={<Predictions />} /><Route path="/unusual" element={<Unusual />} /><Route path="/reports" element={<Reports />} /><Route path="/settings" element={<Settings />} /></Route><Route path="*" element={<NotFound />} /></Routes>
+  return <AuthGate><Routes><Route path="/" element={<Landing />} /><Route element={<Layout />}><Route path="/dashboard" element={<Dashboard />} /><Route path="/transactions" element={<Transactions />} /><Route path="/add-expense" element={<AddExpense />} /><Route path="/import" element={<ImportCsv />} /><Route path="/categories" element={<Categories />} /><Route path="/budgets" element={<Budgets />} /><Route path="/analytics" element={<Analytics />} /><Route path="/predictions" element={<Predictions />} /><Route path="/unusual" element={<Unusual />} /><Route path="/reports" element={<Reports />} /><Route path="/settings" element={<Settings />} /></Route><Route path="*" element={<NotFound />} /></Routes></AuthGate>
 }
