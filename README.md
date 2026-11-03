@@ -1,6 +1,6 @@
 # SpendSense — Personal Expense Intelligence
 
-SpendSense is a single-owner expense management application. It records transactions in MySQL and calculates dashboards, budgets, reports, anomaly indicators, and forecasts from those records. CSV imports are parsed in memory. There are no bank connections, paid APIs, or sample transactions. The app can run locally or be deployed using the optional free-tier configuration below.
+SpendSense is a single-owner expense management application. Local development uses MySQL; the optional free Render demo uses a separate temporary SQLite database. Dashboards, budgets, reports, anomaly indicators, and forecasts are calculated from the selected database's actual records. CSV imports are parsed in memory. There are no bank connections, paid APIs, or sample transactions.
 
 ## Features
 
@@ -18,7 +18,7 @@ SpendSense is a single-owner expense management application. It records transact
 
 - Frontend: React 18, Vite, JavaScript, Tailwind CSS v4, Recharts, React Router, Axios, Lucide React.
 - Backend: Python, FastAPI, Pandas, NumPy, scikit-learn, SQLAlchemy 2, PyMySQL, Pydantic.
-- Database: MySQL.
+- Database: MySQL for local use; SQLite for the optional ephemeral hosted demo.
 
 ## Architecture
 
@@ -156,11 +156,13 @@ npm run build
 
 The statistical and forecast tests use synthetic, in-memory examples only. End-to-end transaction/import/budget/report tests require a configured MySQL account. Verify a local connection with `http://localhost:8000/api/health`, then exercise create/edit/delete, CSV preview/confirm, budgets, and CSV export through the UI or `/docs`.
 
-## Free-tier deployment (Render web + static sites + hosted MySQL)
+## Free-tier deployment (Render web + static sites + temporary SQLite)
 
-The Render Blueprint at `render.yaml` defines the same two-service shape as DataPilot: a Python web service for FastAPI and a static site for the React/Vite frontend. Both are configured for free tiers. The API requires a separately provisioned, remotely accessible **MySQL** server. Render does not provide a free persistent MySQL database, and a MySQL server on your development PC (`127.0.0.1`) cannot be reached by Render. Do not expose your PC's MySQL port to the public internet or replace MySQL with another database. OCI MySQL HeatWave Always Free may be an option; independently verify its current terms, capacity, and identity/card-verification requirements before creating resources.
+The Render Blueprint at `render.yaml` uses the DataPilot-style two-service stack: a Python web service for FastAPI and a static site for React/Vite, with free service plans. Local development continues to use the MySQL settings in `backend\.env`. The hosted API uses a separate SQLite file at `/tmp/spendsense.db`; the laptop's MySQL service and records are not copied, exposed, or modified.
 
-The application now supports optional single-user password authentication. Render enables it and fails closed unless all of `APP_SECRET_KEY`, `APP_PASSWORD_HASH`, and database settings are present. Login returns a signed, expiring bearer token. Generate the production secrets locally without sending them to chat:
+**Important: this is a disposable demo database, not persistent financial storage.** Render Free web services have an ephemeral filesystem. The SQLite database is deleted when the service spins down, restarts, or redeploys. The app may also be unavailable while a free service spins back up. Do not use the hosted demo for records that must be retained. Keep important transactions in your local MySQL database and make backups. Render documents these free-instance limits at <https://render.com/docs/free>.
+
+The application supports single-user password authentication. Render enables it and fails closed unless `APP_SECRET_KEY` and `APP_PASSWORD_HASH` are configured. Login returns a signed, expiring bearer token. Generate the production secrets locally without sending them to chat:
 
 ```powershell
 Set-Location backend
@@ -173,14 +175,13 @@ Save the first output as Render's `APP_SECRET_KEY` and the second output as `APP
 
 ### Deploy the DataPilot-style stack on Render
 
-1. Provision MySQL with a provider that allows secure connections from Render. Create a dedicated, non-root SpendSense user with permission only on the SpendSense database. Keep credentials private. Never expose a laptop's MySQL server to the internet.
-2. In Render, create a Blueprint from the private GitHub repository and review both resources before applying: `spendsense-api` (Python web service, Free) and `spendsense-web` (static site, free). Do not approve any paid plan or upgrade.
-3. Configure the API's `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `APP_SECRET_KEY`, `APP_PASSWORD_HASH`, and `CORS_ORIGINS` values in Render's environment settings. The CORS origin must be the static site's exact HTTPS origin. Generate the authentication secrets locally as described above; do not paste them into chat or commit them.
-4. Configure the static site's `VITE_API_URL` to the API's exact HTTPS base URL ending in `/api`. Because Vite embeds this value at build time, redeploy the static site after changing it. The API URL and web origin may use `spendsense-api.onrender.com` and `spendsense-web.onrender.com` if those names are assigned; verify the actual service URLs in the Render dashboard.
-5. If the MySQL provider requires an IP allowlist, allow only the provider-supported Render egress addresses and database port. Do not open MySQL to all internet addresses. Confirm `https://<api-service>.onrender.com/api/health` returns a connected database before checking the frontend.
-6. Confirm the web service loads, login succeeds, and transactions, CSV import/export, budgets, analytics, forecasts, anomaly indicators, and reports use the hosted MySQL data. Confirm SPA deep links work.
+1. Connect the private GitHub repository to Render.
+2. Create a Blueprint from `render.yaml`. Review the two services before applying: `spendsense-api` (Python web service, Free) and `spendsense-web` (static site, free). Do not approve paid upgrades.
+3. Configure `APP_SECRET_KEY` and `APP_PASSWORD_HASH` in the API's secret environment settings. Generate the values locally as described above. Use a unique password; do not send secrets through chat or commit them.
+4. The Blueprint selects `sqlite:////tmp/spendsense.db`, restricts CORS to the expected frontend origin, and sets the frontend API URL. Confirm Render assigns `https://spendsense-api.onrender.com` and `https://spendsense-web.onrender.com`; update CORS and `VITE_API_URL` if the actual names differ, then redeploy.
+5. Confirm `https://<api-service>.onrender.com/api/health` reports a connected database and the web site loads. Sign in, then exercise transaction CRUD, CSV import/export, budgets, analytics, predictions, unusual expense indicators, reports, and SPA deep links.
 
-Render's free web service may sleep while idle and is not an availability guarantee. The application is still a single-owner workspace: one shared password protects the records; there are no separate user accounts. Configure database backups before entering important financial records. Never enter production credentials in a public issue or chat. No cloud resources are created by this documentation; verify current provider pricing and terms before provisioning.
+The hosted SQLite database starts empty and is separate from local MySQL. Nothing is automatically migrated or synchronized. Free-service restarts, spin-downs, and redeploys erase the hosted SQLite file. The app remains a single-owner workspace: anyone with its shared password can change or delete all hosted demo data. Do not enter valuable or sensitive financial records there. No cloud resources are created by this documentation.
 
 ## Temporary public sharing from a Windows laptop
 

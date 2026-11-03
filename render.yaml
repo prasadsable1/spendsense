@@ -17,18 +17,10 @@ services:
         sync: false
       - key: APP_PASSWORD_HASH
         sync: false
-      - key: DB_HOST
-        sync: false
-      - key: DB_PORT
-        sync: false
-      - key: DB_USER
-        sync: false
-      - key: DB_PASSWORD
-        sync: false
-      - key: DB_NAME
-        sync: false
+      - key: DATABASE_URL
+        value: sqlite:////tmp/spendsense.db
       - key: CORS_ORIGINS
-        sync: false
+        value: https://spendsense-web.onrender.com
   - type: web
     runtime: static
     name: spendsense-web
@@ -41,4 +33,4 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        sync: false
+        value: https://spendsense-api.onrender.com/api

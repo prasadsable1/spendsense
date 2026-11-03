@@ -13,7 +13,7 @@ import pandas as pd
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, extract, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
@@ -93,9 +93,17 @@ async def require_authenticated_owner(request: Request, call_next):
 def _transaction_query(db: Session, year: int | None = None, month: int | None = None):
     query = select(Transaction).options(joinedload(Transaction.category))
     if year is not None:
-        query = query.where(func.year(Transaction.date) == year)
-    if month is not None:
-        query = query.where(func.month(Transaction.date) == month)
+        first_month = month or 1
+        last_month = month or 12
+        start = date(year, first_month, 1)
+        end = (
+            date(year + 1, 1, 1)
+            if last_month == 12
+            else date(year, last_month + 1, 1)
+        )
+        query = query.where(Transaction.date >= start, Transaction.date < end)
+    elif month is not None:
+        query = query.where(extract("month", Transaction.date) == month)
     return query
 
 

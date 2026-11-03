@@ -1,6 +1,6 @@
 from collections.abc import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import database_url
@@ -17,7 +17,21 @@ _session_factory = None
 def get_engine():
     global _engine
     if _engine is None:
-        _engine = create_engine(database_url(), pool_pre_ping=True, pool_recycle=1800)
+        url = database_url()
+        if url.startswith("sqlite:"):
+            _engine = create_engine(
+                url,
+                connect_args={"check_same_thread": False},
+                pool_pre_ping=True,
+            )
+
+            @event.listens_for(_engine, "connect")
+            def enable_sqlite_foreign_keys(connection, _record):
+                cursor = connection.cursor()
+                cursor.execute("PRAGMA foreign_keys=ON")
+                cursor.close()
+        else:
+            _engine = create_engine(url, pool_pre_ping=True, pool_recycle=1800)
     return _engine
 
 

@@ -11,6 +11,10 @@ def setting(name: str, default: str) -> str:
 
 
 def database_url() -> str:
+    configured_url = os.environ.get("DATABASE_URL", "").strip()
+    if configured_url:
+        return configured_url
+
     required = ("DB_USER", "DB_PASSWORD", "DB_NAME")
     missing = [key for key in required if not os.environ.get(key)]
     if missing:
