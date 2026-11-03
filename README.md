@@ -2,7 +2,7 @@
 ## 📸 Application Preview
 
 <div align="center">
-  <img src="spendsense-preview.png" width="100%" alt="SpendSense Application Preview">
+  <img src="Screenshot 2026-11-04 001700.png" width="100%" alt="SpendSense Application Preview">
 
   <p><i>SpendSense — Monthly Budget Tracking Application</i></p>
 </div>
