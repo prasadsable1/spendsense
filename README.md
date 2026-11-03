@@ -1,6 +1,6 @@
 # SpendSense — Personal Expense Intelligence
 
-SpendSense is a local, single-user expense management application. It records transactions in MySQL and calculates dashboards, budgets, reports, anomaly indicators, and forecasts from those records. CSV imports are parsed in memory. There are no bank connections, paid APIs, cloud services, or sample transactions.
+SpendSense is a single-owner expense management application. It records transactions in MySQL and calculates dashboards, budgets, reports, anomaly indicators, and forecasts from those records. CSV imports are parsed in memory. There are no bank connections, paid APIs, or sample transactions. The app can run locally or be deployed using the optional free-tier configuration below.
 
 ## Features
 
@@ -37,7 +37,7 @@ backend/
   tests/                  Analytics and forecast tests
 ```
 
-This version is a local, single-user workspace and does not implement login or multi-user access. Keep the API on a trusted local network. Do not expose it publicly without adding authentication and authorization.
+SpendSense is a single-owner workspace, not a multi-user service. Local development keeps authentication disabled by default; the Render deployment configuration enables a shared password login and fails closed unless its secrets are set. Do not expose an unauthenticated API publicly.
 
 ## Prerequisites
 
