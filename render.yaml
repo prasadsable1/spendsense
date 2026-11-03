@@ -12,15 +12,11 @@ services:
       - key: PYTHON_VERSION
         value: 3.12.10
       - key: APP_AUTH_REQUIRED
-        value: "true"
-      - key: APP_SECRET_KEY
-        sync: false
-      - key: APP_PASSWORD_HASH
-        sync: false
+        value: "false"
       - key: DATABASE_URL
         value: sqlite:////tmp/spendsense.db
       - key: CORS_ORIGINS
-        value: https://spendsense-web.onrender.com
+        value: https://spendsense-web-2dqc.onrender.com
   - type: web
     runtime: static
     name: spendsense-web
@@ -33,4 +29,4 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        value: https://spendsense-api.onrender.com/api
+        value: https://spendsense-api-ajrv.onrender.com/api
