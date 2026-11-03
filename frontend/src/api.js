@@ -5,9 +5,12 @@ if (import.meta.env.PROD && !configuredApiUrl) {
   throw new Error('VITE_API_URL must be configured for a production build.')
 }
 
-const apiBaseUrl = configuredApiUrl || 'http://localhost:8000/api'
+const apiBaseUrl = configuredApiUrl || '/api'
 
-export const apiDocsUrl = new URL('/docs', apiBaseUrl).toString()
+export const apiDocsUrl = new URL(
+  '/docs',
+  new URL(apiBaseUrl, window.location.origin),
+).toString()
 
 const api = axios.create({
   baseURL: apiBaseUrl,

@@ -56,6 +56,7 @@ def test_production_auth_requires_strong_signing_key_and_password_hash(monkeypat
 
 def test_authenticated_deployment_requires_https_cors_origin(monkeypatch):
     monkeypatch.setenv("APP_AUTH_REQUIRED", "true")
+    monkeypatch.delenv("APP_ENV", raising=False)
     monkeypatch.delenv("CORS_ORIGINS", raising=False)
     with pytest.raises(RuntimeError, match="exact HTTPS origin"):
         validate_production_cors()
@@ -65,4 +66,12 @@ def test_authenticated_deployment_requires_https_cors_origin(monkeypatch):
         validate_production_cors()
 
     monkeypatch.setenv("CORS_ORIGINS", "https://spendsense.pages.dev")
+    validate_production_cors()
+
+
+def test_authenticated_local_tunnel_uses_same_origin_proxy(monkeypatch):
+    monkeypatch.setenv("APP_AUTH_REQUIRED", "true")
+    monkeypatch.setenv("APP_ENV", "local_tunnel")
+    monkeypatch.setenv("CORS_ORIGINS", "http://localhost:5173")
+
     validate_production_cors()

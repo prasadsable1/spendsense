@@ -4,6 +4,17 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  server: {
+    host: '127.0.0.1',
+    port: 5174,
+    strictPort: true,
+    allowedHosts: ['.trycloudflare.com'],
+    proxy: {
+      '/api': 'http://127.0.0.1:8002',
+      '/docs': 'http://127.0.0.1:8002',
+      '/openapi.json': 'http://127.0.0.1:8002',
+    },
+  },
   build: {
     rollupOptions: {
       output: {

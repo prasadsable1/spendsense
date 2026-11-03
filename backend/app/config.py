@@ -41,6 +41,8 @@ def cors_origins() -> list[str]:
 
 
 def validate_production_cors() -> None:
+    if os.environ.get("APP_ENV", "").strip().lower() == "local_tunnel":
+        return
     auth_enabled = os.environ.get("APP_AUTH_REQUIRED", "false").strip().lower() in {
         "1",
         "true",

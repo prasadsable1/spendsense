@@ -29,3 +29,16 @@ services:
         sync: false
       - key: CORS_ORIGINS
         sync: false
+  - type: web
+    runtime: static
+    name: spendsense-web
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        sync: false

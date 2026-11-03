@@ -156,9 +156,9 @@ npm run build
 
 The statistical and forecast tests use synthetic, in-memory examples only. End-to-end transaction/import/budget/report tests require a configured MySQL account. Verify a local connection with `http://localhost:8000/api/health`, then exercise create/edit/delete, CSV preview/confirm, budgets, and CSV export through the UI or `/docs`.
 
-## Free-tier deployment (Cloudflare Pages + Render + hosted MySQL)
+## Free-tier deployment (Render web + static sites + hosted MySQL)
 
-The Render Blueprint at `render.yaml` prepares a free Render web service for the API. It requires a separate, remotely accessible **MySQL** server. Render's free plan does not provide a persistent MySQL database or disk, and the MySQL instance on your development PC is not reachable by Render. Do not expose your PC's MySQL port to the public internet. OCI MySQL HeatWave Always Free is one possible MySQL provider; verify its current terms and card-verification requirements directly with OCI before creating an account or service.
+The Render Blueprint at `render.yaml` defines the same two-service shape as DataPilot: a Python web service for FastAPI and a static site for the React/Vite frontend. Both are configured for free tiers. The API requires a separately provisioned, remotely accessible **MySQL** server. Render does not provide a free persistent MySQL database, and a MySQL server on your development PC (`127.0.0.1`) cannot be reached by Render. Do not expose your PC's MySQL port to the public internet or replace MySQL with another database. OCI MySQL HeatWave Always Free may be an option; independently verify its current terms, capacity, and identity/card-verification requirements before creating resources.
 
 The application now supports optional single-user password authentication. Render enables it and fails closed unless all of `APP_SECRET_KEY`, `APP_PASSWORD_HASH`, and database settings are present. Login returns a signed, expiring bearer token. Generate the production secrets locally without sending them to chat:
 
@@ -171,25 +171,38 @@ Set-Location ..
 
 Save the first output as Render's `APP_SECRET_KEY` and the second output as `APP_PASSWORD_HASH` using the Render dashboard's secret environment-variable form. Do not commit these values or put a plaintext password into the repository.
 
-### Deploy FastAPI on Render
+### Deploy the DataPilot-style stack on Render
 
-1. Provision compatible hosted MySQL. Keep its hostname private and restrict access to the Render API service wherever the provider supports network restrictions.
-2. In Render, create a Blueprint from the private GitHub repository and approve the `render.yaml` web service. Select the **Free** plan; do not approve a paid upgrade.
-3. Configure the Blueprint's `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, and `CORS_ORIGINS` prompted secret/environment values. The last value must be the exact HTTPS Cloudflare Pages origin after creating the Pages project. Configure the generated `APP_SECRET_KEY` and `APP_PASSWORD_HASH` as described above.
-4. If the hosted MySQL provider requires an inbound network allowlist, allow only its published Render egress ranges and port. Never open MySQL to all internet addresses.
-5. Confirm the Render service starts and `https://<render-service>.onrender.com/api/health` returns a connected database status before deploying the frontend. A failed DB connection must be fixed in the provider settings, not replaced with SQLite or fake data.
+1. Provision MySQL with a provider that allows secure connections from Render. Create a dedicated, non-root SpendSense user with permission only on the SpendSense database. Keep credentials private. Never expose a laptop's MySQL server to the internet.
+2. In Render, create a Blueprint from the private GitHub repository and review both resources before applying: `spendsense-api` (Python web service, Free) and `spendsense-web` (static site, free). Do not approve any paid plan or upgrade.
+3. Configure the API's `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `APP_SECRET_KEY`, `APP_PASSWORD_HASH`, and `CORS_ORIGINS` values in Render's environment settings. The CORS origin must be the static site's exact HTTPS origin. Generate the authentication secrets locally as described above; do not paste them into chat or commit them.
+4. Configure the static site's `VITE_API_URL` to the API's exact HTTPS base URL ending in `/api`. Because Vite embeds this value at build time, redeploy the static site after changing it. The API URL and web origin may use `spendsense-api.onrender.com` and `spendsense-web.onrender.com` if those names are assigned; verify the actual service URLs in the Render dashboard.
+5. If the MySQL provider requires an IP allowlist, allow only the provider-supported Render egress addresses and database port. Do not open MySQL to all internet addresses. Confirm `https://<api-service>.onrender.com/api/health` returns a connected database before checking the frontend.
+6. Confirm the web service loads, login succeeds, and transactions, CSV import/export, budgets, analytics, forecasts, anomaly indicators, and reports use the hosted MySQL data. Confirm SPA deep links work.
 
-The Render free web service can sleep while idle and take time to wake. Free services are not a production availability guarantee.
+Render's free web service may sleep while idle and is not an availability guarantee. The application is still a single-owner workspace: one shared password protects the records; there are no separate user accounts. Configure database backups before entering important financial records. Never enter production credentials in a public issue or chat. No cloud resources are created by this documentation; verify current provider pricing and terms before provisioning.
 
-### Deploy React on Cloudflare Pages
+## Temporary public sharing from a Windows laptop
 
-1. Create a Pages project from the GitHub repository.
-2. Set the project root/build directory to `frontend`, build command to `npm run build`, and output directory to `dist`.
-3. Set the Pages build environment variable `VITE_API_URL` to `https://<render-service>.onrender.com/api`.
-4. Deploy and note the exact Pages HTTPS origin (for example `https://<project>.pages.dev`). Add that origin to Render's `CORS_ORIGINS`, save, and redeploy/restart the API.
-5. Open the Pages URL; verify the password screen, login, API-backed pages, CSV import/export, and `/api/health`. The `frontend/public/_redirects` file enables client-side route fallback.
+The root `start_all.bat` launcher runs the FastAPI API on `127.0.0.1:8002`, the Vite frontend on `127.0.0.1:5174`, and a temporary Cloudflare Quick Tunnel. The MySQL server remains local on port 3306 and is never placed in the tunnel. The Vite server proxies `/api`, `/docs`, and `/openapi.json` to FastAPI, so browsers use the same HTTPS origin and do not connect to `localhost` on the viewer's computer.
 
-The app remains a single-owner workspace: a shared password protects records, but this is not multi-user authorization. Use a unique long password, keep both providers' secrets private, and configure scheduled database backups before entering important financial records. No resource is created by these instructions. Provider terms, free quotas, availability, and verification requirements can change; confirm them before provisioning.
+Install the official Cloudflare Tunnel Windows package once if needed:
+
+```powershell
+winget install --id Cloudflare.cloudflared -e --accept-source-agreements --accept-package-agreements
+```
+
+From the project root, double-click `start_all.bat` or run:
+
+```powershell
+.\start_all.bat
+```
+
+On first use, the backend window prompts for a private sharing password twice. Choose at least 16 characters. The setup writes only a PBKDF2 password hash and a random signing key into the ignored `backend\.env`; it never saves the plaintext password. Keep the Backend, Frontend, and Tunnel windows open. The Tunnel window prints the temporary `https://…trycloudflare.com` link after Cloudflare connects. Share that link only with people you trust, and send the password separately through a private channel.
+
+The app is protected by one shared password, not separate user accounts. Anyone with both the URL and password can read, import, change, and delete the same financial records. The public link can be probed by others, so use a unique strong password and never use this setup for sensitive records you are not willing to expose through a shared-owner app. API data routes require a signed login token; only health, authentication status, and login are public. The API binds to loopback and the tunnel targets only the frontend. The frontend is a development server and this temporary link is not a production hosting or availability guarantee.
+
+To stop public access, press `Ctrl+C` in the Tunnel window or close it. The API and frontend can remain local, or their windows can also be closed. The Quick Tunnel URL is temporary and changes when a new tunnel is started. The laptop, network connection, frontend, backend, and MySQL must remain running for the link to work; shutting down or sleeping the laptop makes it unavailable. A failed laptop or internet connection does not delete database records, which remain in local MySQL.
 
 ## Screenshots
 
