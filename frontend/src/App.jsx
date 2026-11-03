@@ -14,6 +14,7 @@ import {
 } from 'recharts'
 import api, { apiDocsUrl, errorMessage } from './api.js'
 
+const isPublicDemo = import.meta.env.VITE_PUBLIC_DEMO === 'true'
 const money = (value) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Number(value || 0))
 const today = new Date()
 const currentYear = today.getFullYear()
@@ -46,6 +47,10 @@ function PageTitle({ eyebrow, title, subtitle, action }) {
 function Notice({ children, kind = 'error', onClose }) {
   if (!children) return null
   return <div className={`notice ${kind}`} role="status">{children}{onClose && <button className="icon-button" onClick={onClose} aria-label="Dismiss"><X size={15} /></button>}</div>
+}
+
+function EnvironmentBadge() {
+  return <span className="local-badge"><span /> {isPublicDemo ? 'PUBLIC DEMO' : 'LOCAL & PRIVATE'}</span>
 }
 
 function Loading({ label = 'Loading your financial data…' }) {
@@ -131,10 +136,10 @@ function Layout() {
       <Link to="/dashboard" className="brand"><span className="brand-mark"><Activity size={19} /></span><span>spend<span className="brand-accent">sense</span><small>PERSONAL FINANCE</small></span></Link>
       <div className="profile-card"><div className="avatar">S</div><div><strong>My finances</strong><small>Personal workspace</small></div><ChevronDown size={15} className="muted" /></div>
       <nav className="side-nav">{navGroups.map((group) => <div className="nav-group" key={group.title}><div className="nav-label">{group.title}</div>{group.items.map(({ to, label, icon: Icon }) => <NavLink onClick={() => setMobileOpen(false)} to={to} key={to} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><Icon size={17} /><span>{label}</span>{label === 'Unusual expenses' && <span className="nav-dot" />}</NavLink>)}</div>)}</nav>
-      <div className="sidebar-bottom"><div className="upgrade-card"><span className="upgrade-icon"><Sparkles size={16} /></span><strong>Clarity, every day.</strong><p>Your finances. Your data. Your decisions.</p><Link to="/analytics">Explore insights <ArrowRight size={13} /></Link></div><NavLink to="/settings" className={({ isActive }) => `nav-link settings-link ${isActive ? 'active' : ''}`}><SettingsIcon size={17} /><span>Settings</span></NavLink><div className="sidebar-foot">SpendSense v1.0 · Local workspace</div></div>
+      <div className="sidebar-bottom"><div className="upgrade-card"><span className="upgrade-icon"><Sparkles size={16} /></span><strong>Clarity, every day.</strong><p>Your finances. Your data. Your decisions.</p><Link to="/analytics">Explore insights <ArrowRight size={13} /></Link></div><NavLink to="/settings" className={({ isActive }) => `nav-link settings-link ${isActive ? 'active' : ''}`}><SettingsIcon size={17} /><span>Settings</span></NavLink><div className="sidebar-foot">SpendSense v1.0 · {isPublicDemo ? 'Public demo' : 'Local workspace'}</div></div>
     </aside>
     {mobileOpen && <button className="mobile-backdrop" onClick={() => setMobileOpen(false)} aria-label="Close menu" />}
-    <main className="main-panel"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open menu"><Menu size={19} /></button><div className="breadcrumb">Workspace <span>/</span> <strong>{title}</strong></div><div className="topbar-right"><span className="local-badge"><span /> LOCAL & PRIVATE</span>{sessionStorage.getItem('spendsense_token') && <button className="icon-button" title="Sign out" aria-label="Sign out" onClick={signOut}><ShieldAlert size={18} /></button>}<button className="icon-button" title="Help"><CircleHelp size={18} /></button><span className="avatar small">S</span></div></header><div className="page-content"><Outlet /></div></main>
+    <main className="main-panel"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open menu"><Menu size={19} /></button><div className="breadcrumb">Workspace <span>/</span> <strong>{title}</strong></div><div className="topbar-right"><EnvironmentBadge />{sessionStorage.getItem('spendsense_token') && <button className="icon-button" title="Sign out" aria-label="Sign out" onClick={signOut}><ShieldAlert size={18} /></button>}<button className="icon-button" title="Help"><CircleHelp size={18} /></button><span className="avatar small">S</span></div></header><div className="page-content"><Outlet /></div></main>
   </div>
 }
 
@@ -277,7 +282,7 @@ function AddExpense() {
     try { await api.post('/transactions', payload); navigate('/transactions', { state: { saved: true } }) }
     catch (e) { throw e } finally { setSaving(false) }
   }
-  return <><PageTitle eyebrow="CAPTURE THE DETAILS" title="Add a transaction" subtitle="Small details make your financial picture clearer." /><Notice>{error}</Notice><div className="form-layout"><section className="card form-card"><div className="card-heading"><div><h2>Transaction details</h2><p>Enter the details exactly as they happened.</p></div></div><TransactionForm categories={categories} onSave={save} onCancel={() => navigate('/transactions')} saving={saving} /></section><aside className="form-aside"><div className="insight-card"><span className="insight-orb"><Lightbulb size={19} /></span><h3>A little context goes a long way</h3><p>A clear description and merchant name make it easier to find transactions and understand your habits later.</p></div><div className="privacy-note"><ShieldAlert size={16} /><span><strong>Your data stays yours.</strong><br />Transactions are stored in your local MySQL database.</span></div></aside></div></>
+  return <><PageTitle eyebrow="CAPTURE THE DETAILS" title="Add a transaction" subtitle="Small details make your financial picture clearer." /><Notice>{error}</Notice><div className="form-layout"><section className="card form-card"><div className="card-heading"><div><h2>Transaction details</h2><p>Enter the details exactly as they happened.</p></div></div><TransactionForm categories={categories} onSave={save} onCancel={() => navigate('/transactions')} saving={saving} /></section><aside className="form-aside"><div className="insight-card"><span className="insight-orb"><Lightbulb size={19} /></span><h3>A little context goes a long way</h3><p>A clear description and merchant name make it easier to find transactions and understand your habits later.</p></div><div className="privacy-note"><ShieldAlert size={16} /><span><strong>{isPublicDemo ? 'Public demo data.' : 'Your data stays yours.'}</strong><br />{isPublicDemo ? 'Anyone with the link can see and change these records. Use sample data only.' : 'Transactions are stored in your local MySQL database.'}</span></div></aside></div></>
 }
 
 const mapFields = ['date', 'description', 'amount', 'debit', 'credit', 'type', 'merchant', 'category']
@@ -383,12 +388,59 @@ function Reports() {
 
 function Settings() {
   const { data, loading, error, refresh } = useApiData('/health')
-  return <><PageTitle eyebrow="YOUR SPACE, YOUR SETTINGS" title="Settings" subtitle="Your data is stored locally. You stay in control." /><Notice>{error}</Notice><div className="settings-layout"><section className="card settings-card"><div className="card-heading"><div><h2>Database connection</h2><p>SpendSense uses your configured local MySQL database.</p></div><Database size={18} className="muted" /></div>{loading ? <Loading /> : <div className={`connection-status ${data?.status === 'ok' ? 'connected' : 'disconnected'}`}><span /><div><strong>{data?.status === 'ok' ? 'Connected to MySQL' : 'Not connected'}</strong><small>{data?.database || 'Check backend configuration and restart the API.'}</small></div><button className="button secondary small-button" onClick={refresh}>Check again</button></div>}<div className="setting-item"><div><strong>Storage mode</strong><small>Local MySQL · no cloud sync</small></div><span className="setting-chip">LOCAL</span></div><div className="setting-item"><div><strong>Privacy</strong><small>No bank connection or third-party analytics.</small></div><ShieldAlert size={17} className="green-icon" /></div><div className="setting-item"><div><strong>CSV uploads</strong><small>Files parsed in memory, 5 MB maximum.</small></div><FileSpreadsheet size={17} className="muted" /></div></section><section className="card settings-card"><div className="card-heading"><div><h2>Application details</h2><p>About this SpendSense workspace.</p></div></div><div className="setting-item"><div><strong>Version</strong><small>SpendSense Personal Expense Intelligence</small></div><span className="setting-chip">1.0.0</span></div><div className="setting-item"><div><strong>API documentation</strong><small>Explore available endpoints and schemas.</small></div><a className="text-link" href={apiDocsUrl} target="_blank" rel="noreferrer">Open Swagger <ArrowRight size={14} /></a></div><div className="setting-item"><div><strong>Data export</strong><small>Download all transactions as a CSV.</small></div><button className="icon-button" title="Export transactions" onClick={() => window.open(`${api.defaults.baseURL}/reports/export`, '_blank')}><Download size={16} /></button></div></section></div></>
+  const database = isPublicDemo ? 'SQLite' : 'MySQL'
+  return <>
+    <PageTitle eyebrow="YOUR SPACE, YOUR SETTINGS" title="Settings" subtitle={isPublicDemo ? 'Public demo. Anyone with this link can access and change its data.' : 'Your data is stored locally. You stay in control.'} />
+    <Notice>{error}</Notice>
+    <div className="settings-layout">
+      <section className="card settings-card">
+        <div className="card-heading"><div><h2>Database connection</h2><p>{isPublicDemo ? 'Hosted demo database on Render.' : 'SpendSense uses your configured local MySQL database.'}</p></div><Database size={18} className="muted" /></div>
+        {loading ? <Loading /> : <div className={`connection-status ${data?.status === 'ok' ? 'connected' : 'disconnected'}`}><span /><div><strong>{data?.status === 'ok' ? `Connected to ${database}` : 'Not connected'}</strong><small>{data?.database === 'connected' ? 'Database connection is healthy.' : data?.database || 'Check backend configuration and restart the API.'}</small></div><button className="button secondary small-button" onClick={refresh}>Check again</button></div>}
+        <div className="setting-item"><div><strong>Storage mode</strong><small>{isPublicDemo ? 'Temporary hosted SQLite · data may reset on restart or redeploy' : 'Local MySQL · no cloud sync'}</small></div><span className="setting-chip">{isPublicDemo ? 'DEMO' : 'LOCAL'}</span></div>
+        <div className="setting-item"><div><strong>{isPublicDemo ? 'Public access' : 'Privacy'}</strong><small>{isPublicDemo ? 'Anyone with the URL can view, add, edit, or delete demo records.' : 'No bank connection or third-party analytics.'}</small></div><ShieldAlert size={17} className={isPublicDemo ? 'muted' : 'green-icon'} /></div>
+        <div className="setting-item"><div><strong>CSV uploads</strong><small>Files parsed in memory, 5 MB maximum.</small></div><FileSpreadsheet size={17} className="muted" /></div>
+      </section>
+      <section className="card settings-card">
+        <div className="card-heading"><div><h2>Application details</h2><p>About this SpendSense workspace.</p></div></div>
+        <div className="setting-item"><div><strong>Version</strong><small>SpendSense Personal Expense Intelligence</small></div><span className="setting-chip">1.0.0</span></div>
+        <div className="setting-item"><div><strong>API documentation</strong><small>Explore available endpoints and schemas.</small></div><a className="text-link" href={apiDocsUrl} target="_blank" rel="noreferrer">Open Swagger <ArrowRight size={14} /></a></div>
+        <div className="setting-item"><div><strong>Data export</strong><small>Download all transactions as a CSV.</small></div><button className="icon-button" title="Export transactions" onClick={() => window.open(`${api.defaults.baseURL}/reports/export`, '_blank')}><Download size={16} /></button></div>
+      </section>
+    </div>
+  </>
 }
 
 function Landing() {
   const { data, loading } = useApiData('/health')
-  return <div className="landing"><nav className="landing-nav"><Link className="brand" to="/"><span className="brand-mark"><Activity size={19} /></span><span>spend<span className="brand-accent">sense</span><small>PERSONAL FINANCE</small></span></Link><div><span className="local-badge"><span /> LOCAL & PRIVATE</span><Link className="button primary" to="/dashboard">Open dashboard <ArrowRight size={15} /></Link></div></nav><section className="landing-hero"><div className="hero-copy"><span className="hero-kicker"><span /> A clearer relationship with money</span><h1>Your money.<br /><span>Your understanding.</span></h1><p>See your spending for what it is. Find patterns, build better habits, and make your next decision with confidence.</p><div className="hero-actions"><Link className="button primary large-button" to="/dashboard">Explore your dashboard <ArrowRight size={16} /></Link><Link className="button secondary large-button" to="/add-expense"><Plus size={16} /> Add your first expense</Link></div><div className="hero-trust"><ShieldAlert size={15} /><span>Private by design. Your data stays in your local MySQL database.</span></div></div><div className="hero-art"><div className="hero-glow" /><div className="hero-float float-one"><span className="float-icon purple"><BarChart3 size={15} /></span><div><small>MONTHLY SPENDING</small><strong>Understand every dollar</strong></div><TrendingDown size={17} className="positive" /></div><div className="hero-dashboard-card"><div className="mock-top"><span>MONTHLY OVERVIEW</span><MoreHorizontal size={15} /></div><strong className="mock-amount">A clearer picture.</strong><span className="mock-caption">Your transactions, thoughtfully organized.</span><div className="mock-bars"><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /></div><div className="mock-legend"><span><i /> Spending insights</span><span><i /> Your real data</span></div></div><div className="hero-float float-two"><span className="float-icon green"><Check size={15} /></span><div><strong>Your data stays yours</strong><small>Private. Always.</small></div></div><div className="hero-spark spark-one">✳</div><div className="hero-spark spark-two">✦</div></div></section><section className="feature-strip"><div><span><BarChart3 size={17} /></span><strong>See your patterns</strong><small>Thoughtful analytics from your actual transactions.</small></div><div><span><Target size={17} /></span><strong>Spend with intention</strong><small>Budgets that keep your priorities in view.</small></div><div><span><Sparkles size={17} /></span><strong>Look ahead</strong><small>Clear, honest forecasts from your history.</small></div><div><span><ShieldAlert size={17} /></span><strong>Stay in control</strong><small>Local storage. No bank links. No surprises.</small></div></section><footer className="landing-footer"><span>SpendSense · Personal Expense Intelligence</span><span>{loading ? 'Checking local API…' : data?.status === 'ok' ? '● API connected' : '○ Local API not connected yet'}</span></footer></div>
+  return <div className="landing">
+    <nav className="landing-nav">
+      <Link className="brand" to="/"><span className="brand-mark"><Activity size={19} /></span><span>spend<span className="brand-accent">sense</span><small>PERSONAL FINANCE</small></span></Link>
+      <div><EnvironmentBadge /><Link className="button primary" to="/dashboard">Open dashboard <ArrowRight size={15} /></Link></div>
+    </nav>
+    <section className="landing-hero">
+      <div className="hero-copy">
+        <span className="hero-kicker"><span /> A clearer relationship with money</span>
+        <h1>Your money.<br /><span>Your understanding.</span></h1>
+        <p>See your spending for what it is. Find patterns, build better habits, and make your next decision with confidence.</p>
+        <div className="hero-actions"><Link className="button primary large-button" to="/dashboard">Explore your dashboard <ArrowRight size={16} /></Link><Link className="button secondary large-button" to="/add-expense"><Plus size={16} /> Add your first expense</Link></div>
+        <div className="hero-trust"><ShieldAlert size={15} /><span>{isPublicDemo ? 'Public demo: anyone with this link can view or change the shared demo data.' : 'Private by design. Your data stays in your local MySQL database.'}</span></div>
+      </div>
+      <div className="hero-art">
+        <div className="hero-glow" />
+        <div className="hero-float float-one"><span className="float-icon purple"><BarChart3 size={15} /></span><div><small>MONTHLY SPENDING</small><strong>Understand every dollar</strong></div><TrendingDown size={17} className="positive" /></div>
+        <div className="hero-dashboard-card"><div className="mock-top"><span>MONTHLY OVERVIEW</span><MoreHorizontal size={15} /></div><strong className="mock-amount">A clearer picture.</strong><span className="mock-caption">Your transactions, thoughtfully organized.</span><div className="mock-bars"><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /></div><div className="mock-legend"><span><i /> Spending insights</span><span><i /> Your real data</span></div></div>
+        <div className="hero-float float-two"><span className="float-icon green"><Check size={15} /></span><div><strong>{isPublicDemo ? 'Shared demo data' : 'Your data stays yours'}</strong><small>{isPublicDemo ? 'Anyone with the link can access it.' : 'Private. Always.'}</small></div></div>
+        <div className="hero-spark spark-one">✳</div><div className="hero-spark spark-two">✦</div>
+      </div>
+    </section>
+    <section className="feature-strip">
+      <div><span><BarChart3 size={17} /></span><strong>See your patterns</strong><small>Thoughtful analytics from your actual transactions.</small></div>
+      <div><span><Target size={17} /></span><strong>Spend with intention</strong><small>Budgets that keep your priorities in view.</small></div>
+      <div><span><Sparkles size={17} /></span><strong>Look ahead</strong><small>Clear, honest forecasts from your history.</small></div>
+      <div><span><ShieldAlert size={17} /></span><strong>{isPublicDemo ? 'Demo data only' : 'Stay in control'}</strong><small>{isPublicDemo ? 'Avoid sensitive financial records.' : 'Local storage. No bank links. No surprises.'}</small></div>
+    </section>
+    <footer className="landing-footer"><span>SpendSense · Personal Expense Intelligence</span><span>{loading ? 'Checking API…' : data?.status === 'ok' ? '● API connected' : '○ API not connected yet'}</span></footer>
+  </div>
 }
 
 function NotFound() { return <div className="not-found"><strong>404</strong><h1>That page isn't here.</h1><Link className="button primary" to="/dashboard">Back to dashboard</Link></div> }

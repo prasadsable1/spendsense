@@ -30,3 +30,5 @@ services:
     envVars:
       - key: VITE_API_URL
         value: https://spendsense-api-ajrv.onrender.com/api
+      - key: VITE_PUBLIC_DEMO
+        value: "true"
