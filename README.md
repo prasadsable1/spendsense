@@ -37,7 +37,7 @@ backend/
   tests/                  Analytics and forecast tests
 ```
 
-SpendSense is a single-owner workspace, not a multi-user service. Local development keeps authentication disabled by default; the Render deployment configuration enables a shared password login and fails closed unless its secrets are set. Do not expose an unauthenticated API publicly.
+SpendSense is a single-owner workspace, not a multi-user service. Local development keeps authentication disabled by default. The free Render demo also disables authentication for easy sharing: anyone with its link can view, import, change, and delete the same hosted demo data. Do not use it for sensitive or valuable financial records.
 
 ## Prerequisites
 
@@ -162,7 +162,7 @@ The Render Blueprint at `render.yaml` uses the DataPilot-style two-service stack
 
 **Important: this is a disposable demo database, not persistent financial storage.** Render Free web services have an ephemeral filesystem. The SQLite database is deleted when the service spins down, restarts, or redeploys. The app may also be unavailable while a free service spins back up. Do not use the hosted demo for records that must be retained. Keep important transactions in your local MySQL database and make backups. Render documents these free-instance limits at <https://render.com/docs/free>.
 
-The application supports single-user password authentication. Render enables it and fails closed unless `APP_SECRET_KEY` and `APP_PASSWORD_HASH` are configured. Login returns a signed, expiring bearer token. Generate the production secrets locally without sending them to chat:
+The application has optional single-user password authentication for private deployments. It is disabled in the public Render demo. To enable it in a deployment you control, set `APP_AUTH_REQUIRED=true`, create an `APP_SECRET_KEY`, and generate `APP_PASSWORD_HASH` locally:
 
 ```powershell
 Set-Location backend
@@ -171,17 +171,16 @@ Set-Location backend
 Set-Location ..
 ```
 
-Save the first output as Render's `APP_SECRET_KEY` and the second output as `APP_PASSWORD_HASH` using the Render dashboard's secret environment-variable form. Do not commit these values or put a plaintext password into the repository.
+Store the generated values only in that deployment's secret environment settings. Do not commit them or put a plaintext password into the repository.
 
 ### Deploy the DataPilot-style stack on Render
 
 1. Connect the private GitHub repository to Render.
 2. Create a Blueprint from `render.yaml`. Review the two services before applying: `spendsense-api` (Python web service, Free) and `spendsense-web` (static site, free). Do not approve paid upgrades.
-3. Configure `APP_SECRET_KEY` and `APP_PASSWORD_HASH` in the API's secret environment settings. Generate the values locally as described above. Use a unique password; do not send secrets through chat or commit them.
-4. The Blueprint selects `sqlite:////tmp/spendsense.db`, restricts CORS to the expected frontend origin, and sets the frontend API URL. Confirm Render assigns `https://spendsense-api.onrender.com` and `https://spendsense-web.onrender.com`; update CORS and `VITE_API_URL` if the actual names differ, then redeploy.
-5. Confirm `https://<api-service>.onrender.com/api/health` reports a connected database and the web site loads. Sign in, then exercise transaction CRUD, CSV import/export, budgets, analytics, predictions, unusual expense indicators, reports, and SPA deep links.
+3. The Blueprint selects `sqlite:////tmp/spendsense.db`, disables authentication for public demo access, restricts CORS to the frontend origin, and sets the frontend API URL. If Render assigns different service URLs, update `CORS_ORIGINS` and `VITE_API_URL`, then redeploy.
+4. Confirm the API health endpoint reports a connected database, `/api/auth/status` reports `required: false`, and the frontend loads. Exercise transaction CRUD, CSV import/export, budgets, analytics, predictions, unusual expense indicators, reports, and SPA deep links.
 
-The hosted SQLite database starts empty and is separate from local MySQL. Nothing is automatically migrated or synchronized. Free-service restarts, spin-downs, and redeploys erase the hosted SQLite file. The app remains a single-owner workspace: anyone with its shared password can change or delete all hosted demo data. Do not enter valuable or sensitive financial records there. No cloud resources are created by this documentation.
+The hosted SQLite database starts empty and is separate from local MySQL. Nothing is automatically migrated or synchronized. Free-service restarts, spin-downs, and redeploys erase the hosted SQLite file. The Render demo has no login: anyone with the public URL can view and change all hosted demo data, including deleting it. Do not enter valuable or sensitive financial records there. No cloud resources are created by this documentation.
 
 ## Temporary public sharing from a Windows laptop
 
